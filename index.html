@@ -9,6 +9,7 @@
 <title>Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -26,6 +27,22 @@
   --sft:env(safe-area-inset-top,0px);--sfb:env(safe-area-inset-bottom,0px);
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;overflow:hidden;}
+/* LOGIN */
+.login-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:999;padding:24px;}
+.login-card{width:100%;max-width:360px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;padding:36px 32px;}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;}
+.login-logo-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;}
+.login-logo-text{font-size:16px;font-weight:600;letter-spacing:-.3px;}
+.login-h{font-size:20px;font-weight:600;letter-spacing:-.4px;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:28px;}
+.login-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-family:var(--mono);margin-bottom:6px;}
+.login-input{width:100%;padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:14px;outline:none;margin-bottom:16px;}
+.login-input:focus{border-color:var(--accent);}
+.login-btn{width:100%;padding:11px;background:var(--accent);border:none;border-radius:var(--r);color:#fff;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:background .15s;}
+.login-btn:hover{background:var(--accent2);}
+.login-btn:disabled{opacity:.5;cursor:default;}
+.login-msg{margin-top:16px;font-size:13px;text-align:center;color:var(--text2);min-height:20px;}
+.login-success{color:var(--green);}
 .app{display:flex;height:100vh;}
 /* SIDEBAR */
 .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;overflow-y:auto;}
@@ -279,7 +296,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 </style>
 </head>
 <body>
-<div class="app">
+<!-- LOGIN SCREEN -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">B</div>
+      <div class="login-logo-text">The Base</div>
+    </div>
+    <div class="login-h">Welcome back</div>
+    <div class="login-sub">Enter your email to receive a magic link.</div>
+    <div class="login-label">Email</div>
+    <input class="login-input" type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+    <button class="login-btn" id="login-btn" onclick="sendMagicLink()">Send magic link</button>
+    <div class="login-msg" id="login-msg"></div>
+  </div>
+</div>
+
+<div class="app" id="app-root" style="display:none">
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="logo-wrap">
@@ -315,6 +348,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     </div>
     <div class="date-big" id="sday"></div>
     <div class="date-sm" id="sdate"></div>
+    <div class="ni" onclick="signOut()" style="margin-top:10px;color:var(--text3)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3"/><polyline points="10,5 13,8 10,11"/><line x1="13" y1="8" x2="5" y2="8"/></svg>
+      Sign out
+    </div>
   </div>
 </aside>
 
@@ -620,36 +657,81 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 const SB_URL='https://caoljxrltltdgffajmuz.supabase.co';
 const SB_KEY='sb_publishable_Mm6msWwZeUDXYoDjw8QmEw_7LVt9ASA';
 
-// Supabase REST helper
+// Supabase auth client
+const sbClient=supabase.createClient(SB_URL,SB_KEY);
+let authToken=SB_KEY; // replaced with user JWT after login
+
+// Supabase REST helper — uses authToken so RLS can identify the user
 const db={
   async get(table,params=''){
-    const r=await fetch(`${SB_URL}/rest/v1/${table}${params}`,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}});
+    const r=await fetch(`${SB_URL}/rest/v1/${table}${params}`,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json'}});
     if(!r.ok)throw new Error(await r.text());
     return r.json();
   },
   async insert(table,data){
-    const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});
+    const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});
     if(!r.ok)throw new Error(await r.text());
     return r.json();
   },
   async update(table,match,data){
     const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join('&');
-    const r=await fetch(`${SB_URL}/rest/v1/${table}?${q}`,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${q}`,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});
     if(!r.ok)throw new Error(await r.text());
     return r.json();
   },
   async upsert(table,data,onConflict='id'){
-    const r=await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation,resolution=merge-duplicates'},body:JSON.stringify(data)});
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json','Prefer':'return=representation,resolution=merge-duplicates'},body:JSON.stringify(data)});
     if(!r.ok)throw new Error(await r.text());
     return r.json();
   },
   async del(table,match){
     const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join('&');
-    const r=await fetch(`${SB_URL}/rest/v1/${table}?${q}`,{method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    const r=await fetch(`${SB_URL}/rest/v1/${table}?${q}`,{method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+authToken}});
     if(!r.ok)throw new Error(await r.text());
     return true;
   }
 };
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-root').style.display='flex';
+}
+function showLogin(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app-root').style.display='none';
+}
+async function sendMagicLink(){
+  const email=document.getElementById('login-email').value.trim();
+  const msg=document.getElementById('login-msg');
+  const btn=document.getElementById('login-btn');
+  if(!email){msg.textContent='Please enter your email.';return;}
+  btn.disabled=true;btn.textContent='Sending…';msg.textContent='';
+  const{error}=await sbClient.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
+  if(error){msg.textContent=error.message;btn.disabled=false;btn.textContent='Send magic link';}
+  else{msg.innerHTML='<span class="login-success">✓ Check your email for the magic link.</span>';btn.textContent='Send magic link';}
+}
+async function signOut(){
+  await sbClient.auth.signOut();
+  authToken=SB_KEY;
+  showLogin();
+}
+// Handle auth state — fires on magic link redirect, token refresh, and sign out
+let appLoaded=false;
+sbClient.auth.onAuthStateChange((event,session)=>{
+  if(session){
+    authToken=session.access_token;
+    showApp();
+    if(!appLoaded){appLoaded=true;loadAll();}
+  }else{
+    appLoaded=false;
+    showLogin();
+  }
+});
+// Init: check for existing session on page load
+sbClient.auth.getSession().then(({data:{session}})=>{
+  if(session){authToken=session.access_token;showApp();appLoaded=true;loadAll();}
+});
 
 // LocalStorage fallback cache (offline resilience)
 const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
@@ -1371,8 +1453,8 @@ function updateTargetsFromSettings(){
   save();
 }
 
-// ── INIT ─────────────────────────────────────────────────────────────────────
-loadAll();
+// ── INIT — loadAll() is called by auth flow, not directly ────────────────────
+// Auth state change handler above calls loadAll() once session is confirmed.
 </script>
 </body>
 </html>
