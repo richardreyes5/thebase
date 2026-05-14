@@ -140,11 +140,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .hr{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
 .hr:last-child{border-bottom:none;}
 .hn{flex:1;font-size:13px;}
-.hst{font-size:11px;color:var(--amber);font-family:var(--mono);margin-right:8px;}
-.hds{display:flex;gap:3px;}
-.hd{width:10px;height:10px;border-radius:2px;background:var(--bg4);cursor:pointer;transition:all .1s;}
-.hd.done{background:var(--green);}
-.hd.today{border:1px solid var(--border2);}
+.hcard{background:var(--bg2);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
+.hcard:last-child{margin-bottom:0;}
+.hrow{display:flex;align-items:center;gap:8px;}
+.hname{flex:1;font-size:13px;font-weight:500;}
+.hstreak{font-size:11px;color:var(--amber);font-family:var(--mono);white-space:nowrap;}
+.hbtn{padding:5px 12px;border-radius:var(--r);font-size:12px;font-weight:500;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap;}
+.hbtn.done{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.hbtn:not(.done):hover{background:var(--bg3);color:var(--text);}
+.htoggle{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;font-family:var(--mono);padding:2px 4px;white-space:nowrap;}
+.htoggle:hover{color:var(--text2);}
+.hhistory{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.hdaylabels{display:flex;gap:4px;padding-left:36px;margin-bottom:4px;}
+.hdaylbl{width:20px;font-size:9px;font-family:var(--mono);color:var(--text3);text-align:center;}
+.hweek{display:flex;gap:4px;margin-bottom:4px;align-items:center;}
+.hwlbl{font-size:9px;font-family:var(--mono);color:var(--text3);width:32px;flex-shrink:0;}
+.hday{width:20px;height:20px;border-radius:3px;background:var(--bg4);flex-shrink:0;}
+.hday.done{background:var(--green);}
+.hday.today{box-shadow:0 0 0 1px var(--accent);}
+.hday.future{opacity:.2;}
 /* TODO */
 .ti{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid var(--border);}
 .ti:last-child{border-bottom:none;}
@@ -414,7 +428,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <!-- HABITS -->
   <div id="view-habits" class="view"><div class="content">
     <div class="card" style="max-width:700px"><div class="ch"><span class="ct">Habit tracker</span><span class="ca" onclick="addHabit()">+ Add habit</span></div><div class="cb">
-      <div style="display:flex;gap:8px;margin-bottom:10px;font-size:10px;font-family:var(--mono);color:var(--text3)"><span style="flex:1">Habit</span><span style="margin-right:8px">Streak</span><span style="width:90px;text-align:right">7 days</span></div>
       <div id="hlist"></div>
     </div></div>
   </div></div>
@@ -1062,10 +1075,44 @@ function toggleEx(el,n){
 // ── HABITS ───────────────────────────────────────────────────────────────────
 function renderHabits(){
   const l=document.getElementById('hlist');if(!l)return;
-  const days7=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d.toISOString().split('T')[0];});
-  l.innerHTML=S.habits.map(h=>`
-    <div class="hr"><span class="hn">${h.name}</span><span class="hst">${streak(h)}🔥</span>
-    <div class="hds">${days7.map(d=>`<div class="hd ${h.log.includes(d)?'done':''} ${d===TODAY?'today':''}" onclick="toggleHabitDay(${h.id},'${d}')"></div>`).join('')}</div></div>`).join('');
+  // 4-week grid always aligned Mon–Sun
+  const anchor=new Date();
+  const dow=anchor.getDay()||7;
+  anchor.setDate(anchor.getDate()-(dow-1)-21);
+  const days28=Array.from({length:28},(_,i)=>{const d=new Date(anchor);d.setDate(anchor.getDate()+i);return d.toISOString().split('T')[0];});
+  const weeks=[0,7,14,21].map(i=>days28.slice(i,i+7));
+  const DAY_LABELS=['M','T','W','T','F','S','S'];
+  l.innerHTML=S.habits.length===0
+    ?'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No habits yet — add one above</div>'
+    :S.habits.map(h=>{
+      const isDone=h.log.includes(TODAY);
+      const st=streak(h);
+      const dots=weeks.map(wk=>`
+        <div class="hweek">
+          <div class="hwlbl">${wk[0].slice(5).replace('-','/')}</div>
+          ${wk.map(d=>`<div class="hday ${h.log.includes(d)?'done':''} ${d===TODAY?'today':''} ${d>TODAY?'future':''}" title="${d}"></div>`).join('')}
+        </div>`).join('');
+      return `<div class="hcard">
+        <div class="hrow">
+          <span class="hname">${h.name}</span>
+          <span class="hstreak">${st>0?st+'🔥':'—'}</span>
+          <button class="hbtn${isDone?' done':''}" onclick="toggleHabitDay(${h.id},'${TODAY}')">${isDone?'✓ Done':'Mark done'}</button>
+          <button class="htoggle" id="htb-${h.id}" onclick="toggleHist(${h.id})">history ↓</button>
+        </div>
+        <div class="hhistory" id="hist-${h.id}" style="display:none">
+          <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-bottom:8px">${h.log.length} total completions</div>
+          <div class="hdaylabels">${DAY_LABELS.map(d=>`<div class="hdaylbl">${d}</div>`).join('')}</div>
+          ${dots}
+        </div>
+      </div>`;
+    }).join('');
+}
+function toggleHist(id){
+  const el=document.getElementById('hist-'+id),btn=document.getElementById('htb-'+id);
+  if(!el)return;
+  const open=el.style.display==='block';
+  el.style.display=open?'none':'block';
+  btn.textContent=open?'history ↓':'history ↑';
 }
 function streak(h){let s=0,d=new Date();while(h.log.includes(d.toISOString().split('T')[0])){s++;d.setDate(d.getDate()-1);}return s;}
 function toggleHabitDay(id,dk){
