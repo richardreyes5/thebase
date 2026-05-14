@@ -304,10 +304,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="login-logo-text">The Base</div>
     </div>
     <div class="login-h">Welcome back</div>
-    <div class="login-sub">Enter your email to receive a magic link.</div>
+    <div class="login-sub">Sign in to your personal command center.</div>
     <div class="login-label">Email</div>
     <input class="login-input" type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
-    <button class="login-btn" id="login-btn" onclick="sendMagicLink()">Send magic link</button>
+    <div class="login-label">Password</div>
+    <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()">
+    <button class="login-btn" id="login-btn" onclick="signIn()">Sign in</button>
     <div class="login-msg" id="login-msg"></div>
   </div>
 </div>
@@ -701,15 +703,15 @@ function showLogin(){
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-root').style.display='none';
 }
-async function sendMagicLink(){
+async function signIn(){
   const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
   const msg=document.getElementById('login-msg');
   const btn=document.getElementById('login-btn');
-  if(!email){msg.textContent='Please enter your email.';return;}
-  btn.disabled=true;btn.textContent='Sending…';msg.textContent='';
-  const{error}=await sbClient.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
-  if(error){msg.textContent=error.message;btn.disabled=false;btn.textContent='Send magic link';}
-  else{msg.innerHTML='<span class="login-success">✓ Check your email for the magic link.</span>';btn.textContent='Send magic link';}
+  if(!email||!password){msg.textContent='Please enter your email and password.';return;}
+  btn.disabled=true;btn.textContent='Signing in…';msg.textContent='';
+  const{error}=await sbClient.auth.signInWithPassword({email,password});
+  if(error){msg.textContent=error.message;btn.disabled=false;btn.textContent='Sign in';}
 }
 async function signOut(){
   await sbClient.auth.signOut();
