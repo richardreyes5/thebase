@@ -70,7 +70,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 @media(max-width:768px){
   .sidebar{display:none;}
   .bnav{display:flex;}
-  .main{padding-bottom:var(--bnav-h);}
+  .main{padding-bottom:calc(var(--bnav-h) + var(--sfb));}
   .topbar{padding:12px 16px;padding-top:calc(12px + var(--sft));}
   .content{padding:14px;}
   .dg{grid-template-columns:1fr 1fr!important;}
