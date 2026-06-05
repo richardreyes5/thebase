@@ -453,7 +453,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <!-- NUTRITION -->
   <div id="view-nutrition" class="view"><div class="content">
     <div class="ng">
-      <div class="card"><div class="ch"><span class="ct">Today's macros</span><span style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="ndate"></span></div><div class="cb">
+      <div class="card"><div class="ch">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn sm" onclick="changeNutrDate(-1)" style="padding:3px 9px;font-size:13px;line-height:1">←</button>
+          <span class="ct" id="nutr-date-lbl">Today's macros</span>
+          <button class="btn sm" id="nutr-next" onclick="changeNutrDate(1)" style="padding:3px 9px;font-size:13px;line-height:1;visibility:hidden">→</button>
+        </div>
+        <span style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="ndate"></span>
+      </div><div class="cb">
         <div class="mr"><span class="ml">Calories</span><div class="mt"><div class="mf fcl" id="fccal" style="width:0%"></div></div><span class="mv" id="vcal">0/2200</span></div>
         <div class="mr"><span class="ml">Protein</span><div class="mt"><div class="mf fp" id="fcpro" style="width:0%"></div></div><span class="mv" id="vpro">0/180g</span></div>
         <div class="mr"><span class="ml">Carbs</span><div class="mt"><div class="mf fcb" id="fccarb" style="width:0%"></div></div><span class="mv" id="vcarb">0/220g</span></div>
@@ -781,6 +788,7 @@ sbClient.auth.getSession().then(({data:{session}})=>{
 // LocalStorage fallback cache (offline resilience)
 const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 const TODAY=new Date().toISOString().split('T')[0];
+let nutrDate=TODAY;
 
 // ── STATE (in-memory, loaded from Supabase on init) ──────────────────────────
 const S={
@@ -1160,6 +1168,21 @@ function addHabit(){
 }
 
 // ── NUTRITION ────────────────────────────────────────────────────────────────
+async function changeNutrDate(delta){
+  const d=new Date(nutrDate+'T12:00:00');
+  d.setDate(d.getDate()+delta);
+  const next=d.toISOString().split('T')[0];
+  if(next>TODAY)return;
+  await loadNutrDate(next);
+}
+async function loadNutrDate(date){
+  nutrDate=date;
+  const fl=document.getElementById('flog');
+  if(fl)fl.innerHTML='<div style="color:var(--text3);font-size:12px;padding:8px 0">Loading…</div>';
+  try{S.nutrition.foods=await db.get('nutrition_foods',`?log_date=eq.${date}&order=created_at.asc`);}
+  catch(e){S.nutrition.foods=[];}
+  renderNutr();
+}
 function renderNutr(){
   const foods=S.nutrition.foods,t=S.nutrition.targets;
   const cal=foods.reduce((a,f)=>a+f.cal,0),pro=foods.reduce((a,f)=>a+f.pro,0),carb=foods.reduce((a,f)=>a+(f.carb||0),0);
@@ -1168,6 +1191,17 @@ function renderNutr(){
     const b=document.getElementById(bid);if(b)b.style.width=pct(v,mx)+'%';
     const tv=document.getElementById(tid);if(tv)tv.textContent=lbl;
   });
+  // date label + next arrow
+  const lbl=document.getElementById('nutr-date-lbl');
+  const nxt=document.getElementById('nutr-next');
+  if(lbl){
+    const yest=new Date();yest.setDate(yest.getDate()-1);
+    const yStr=yest.toISOString().split('T')[0];
+    if(nutrDate===TODAY)lbl.textContent="Today's macros";
+    else if(nutrDate===yStr)lbl.textContent="Yesterday's macros";
+    else{const d=new Date(nutrDate+'T12:00:00');lbl.textContent=d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
+  }
+  if(nxt)nxt.style.visibility=nutrDate===TODAY?'hidden':'visible';
   // sync target inputs
   ['cal','pro','carb','fat'].forEach(k=>{const e=document.getElementById('tg'+k);if(e)e.value=t[k];});
   const fl=document.getElementById('flog');
@@ -1188,7 +1222,7 @@ function updateTargets(){
 function addFood(){
   const n=document.getElementById('fn'),c=document.getElementById('fcc'),p=document.getElementById('fcp'),cb=document.getElementById('fccb');
   if(!n.value.trim()||!c.value)return;
-  const food={id:Date.now(),name:n.value.trim(),cal:parseInt(c.value)||0,pro:parseInt(p.value)||0,carb:parseInt(cb.value)||0,log_date:TODAY};
+  const food={id:Date.now(),name:n.value.trim(),cal:parseInt(c.value)||0,pro:parseInt(p.value)||0,carb:parseInt(cb.value)||0,log_date:nutrDate};
   n.value='';c.value='';p.value='';cb.value='';
   S.nutrition.foods.push(food);save();renderNutr();if(cv==='dashboard')renderDash();
   db.insert('nutrition_foods',food).catch(console.error);
@@ -1228,7 +1262,7 @@ function saveFood(i){
   db.update('nutrition_foods',{id:f.id},{name:f.name,cal:f.cal,pro:f.pro,carb:f.carb}).catch(console.error);
 }
 function addDefFood(d){
-  const food={id:Date.now(),name:d.name,cal:d.cal,pro:d.pro,carb:d.carb||0,fat:d.fat||0,log_date:TODAY};
+  const food={id:Date.now(),name:d.name,cal:d.cal,pro:d.pro,carb:d.carb||0,fat:d.fat||0,log_date:nutrDate};
   S.nutrition.foods.push(food);save();renderNutr();if(cv==='dashboard')renderDash();
   db.insert('nutrition_foods',food).catch(console.error);
 }
@@ -1345,7 +1379,7 @@ function logFSFood(){
   const g=_fsUnit==='oz'?val*28.3495:val;
   const scale=g/100;
   const label=_fsUnit==='oz'?`${val}oz`:`${Math.round(g)}g`;
-  const food={id:Date.now(),name:`${fsSelected.name} (${label})`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale),log_date:TODAY};
+  const food={id:Date.now(),name:`${fsSelected.name} (${label})`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale),log_date:nutrDate};
   S.nutrition.foods.push(food);save();closeFS();renderNutr();if(cv==='dashboard')renderDash();
   db.insert('nutrition_foods',food).catch(console.error);
 }
