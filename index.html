@@ -1502,6 +1502,23 @@ function updateTargetsFromSettings(){
   save();
 }
 
+// ── iOS KEYBOARD SCROLL FIX ───────────────────────────────────────────────────
+// When the keyboard opens, visualViewport shrinks. We add the difference as
+// padding-bottom on .main so the user can scroll past the keyboard to reach
+// buttons below focused inputs. Resets automatically when keyboard closes.
+if(window.visualViewport){
+  const main=document.querySelector('.main');
+  window.visualViewport.addEventListener('resize',()=>{
+    const kbh=Math.round(Math.max(0,window.innerHeight-window.visualViewport.height));
+    if(kbh>100){
+      main.style.paddingBottom=kbh+'px';
+      setTimeout(()=>document.activeElement?.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+    }else{
+      main.style.paddingBottom='';
+    }
+  });
+}
+
 // ── INIT — loadAll() is called by auth flow, not directly ────────────────────
 // Auth state change handler above calls loadAll() once session is confirmed.
 </script>
