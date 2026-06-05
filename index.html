@@ -630,7 +630,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         </div>
         <div id="fs-portion-macros" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;align-content:center"></div>
       </div>
-      <button class="btn ac" style="width:100%" onclick="logFSFood()">+ Log this food</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn ac" style="flex:1" onclick="logFSFood()">+ Log today</button>
+        <button class="btn" style="flex:1" onclick="saveFSToDefaults()">Save to defaults</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1345,6 +1348,20 @@ function logFSFood(){
   const food={id:Date.now(),name:`${fsSelected.name} (${label})`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale),log_date:TODAY};
   S.nutrition.foods.push(food);save();closeFS();renderNutr();if(cv==='dashboard')renderDash();
   db.insert('nutrition_foods',food).catch(console.error);
+}
+
+function saveFSToDefaults(){
+  if(!fsSelected)return;
+  const val=parseFloat(document.getElementById('fs-grams').value)||(_fsUnit==='oz'?3.5:100);
+  const g=_fsUnit==='oz'?val*28.3495:val;
+  const scale=g/100;
+  const label=_fsUnit==='oz'?`${val}oz`:`${Math.round(g)}g`;
+  const def={id:Date.now(),name:`${fsSelected.name} (${label})`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale)};
+  S.defaults.push(def);save();
+  db.insert('default_foods',def).catch(console.error);
+  // Visual confirmation on the button
+  const btn=document.querySelector('[onclick="saveFSToDefaults()"]');
+  if(btn){btn.textContent='✓ Saved';btn.disabled=true;setTimeout(()=>{btn.textContent='Save to defaults';btn.disabled=false;},2000);}
 }
 
 // ── BARCODE SCANNER (Open Food Facts) ────────────────────────────────────────
