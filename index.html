@@ -98,6 +98,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .bgrid{grid-template-columns:1fr 1fr!important;}
   .gpg{grid-template-columns:1fr!important;}
   .tb-actions .btn:not(.ac){display:none;}
+  .fld,.fle{opacity:1;}
 }
 /* CARDS */
 .card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;}
@@ -223,7 +224,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .fli{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .fli:last-child{border-bottom:none;}
 .fld{color:var(--text3);cursor:pointer;opacity:0;}
-.fli:hover .fld{opacity:1;}
+.fle{color:var(--accent);cursor:pointer;opacity:0;font-size:11px;font-family:var(--mono);}
+.fli:hover .fld,.fli:hover .fle{opacity:1;}
+.fli-edit{padding:8px 0;border-bottom:1px solid var(--border);}
+.fli-edit:last-child{border-bottom:none;}
+.fli-inputs{display:flex;gap:4px;align-items:center;margin-bottom:6px;}
+.fli-acts{display:flex;gap:6px;}
 .far{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
 .ci{width:70px;}
 /* DEFAULT FOODS */
@@ -1142,9 +1148,12 @@ function renderNutr(){
   ['cal','pro','carb','fat'].forEach(k=>{const e=document.getElementById('tg'+k);if(e)e.value=t[k];});
   const fl=document.getElementById('flog');
   if(fl)fl.innerHTML=foods.length?foods.map((f,i)=>`
-    <div class="fli"><span>${f.name}</span>
-    <span style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);color:var(--text3);font-size:11px">${f.cal} kcal${f.pro?' · '+f.pro+'g P':''}</span>
-    <span class="fld" onclick="removeFood(${i})">×</span></span></div>`).join(''):'<div class="empty" style="padding:8px 0">No food logged yet</div>';
+    <div class="fli" id="fli-${i}"><span>${f.name}</span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span style="font-family:var(--mono);color:var(--text3);font-size:11px">${f.cal} kcal${f.pro?' · '+f.pro+'g P':''}</span>
+      <span class="fle" onclick="editFood(${i})">edit</span>
+      <span class="fld" onclick="removeFood(${i})">×</span>
+    </span></div>`).join(''):'<div class="empty" style="padding:8px 0">No food logged yet</div>';
   renderDfChips();
 }
 function updateTargets(){
@@ -1164,6 +1173,35 @@ function removeFood(i){
   const food=S.nutrition.foods[i];
   S.nutrition.foods.splice(i,1);save();renderNutr();if(cv==='dashboard')renderDash();
   if(food?.id)db.del('nutrition_foods',{id:food.id}).catch(console.error);
+}
+function editFood(i){
+  const f=S.nutrition.foods[i];
+  const el=document.getElementById('fli-'+i);
+  if(!el)return;
+  el.outerHTML=`<div class="fli-edit" id="fli-${i}">
+    <div class="fli-inputs">
+      <input class="inp" style="flex:1;font-size:12px;padding:4px 8px" id="fei-n-${i}" value="${f.name}">
+      <input class="inp" style="width:58px;font-size:12px;padding:4px 6px" type="number" id="fei-c-${i}" value="${f.cal}" placeholder="kcal">
+      <input class="inp" style="width:48px;font-size:12px;padding:4px 6px" type="number" id="fei-p-${i}" value="${f.pro}" placeholder="P(g)">
+      <input class="inp" style="width:48px;font-size:12px;padding:4px 6px" type="number" id="fei-cb-${i}" value="${f.carb||0}" placeholder="C(g)">
+    </div>
+    <div class="fli-acts">
+      <button class="btn ac sm" onclick="saveFood(${i})">Save</button>
+      <button class="btn sm" onclick="renderNutr()">Cancel</button>
+      <button class="btn sm" style="color:var(--red);border-color:var(--red-bg)" onclick="removeFood(${i})">Delete</button>
+    </div>
+  </div>`;
+}
+function saveFood(i){
+  const f=S.nutrition.foods[i];
+  const name=document.getElementById('fei-n-'+i)?.value.trim();
+  if(!name)return;
+  f.name=name;
+  f.cal=parseInt(document.getElementById('fei-c-'+i)?.value)||0;
+  f.pro=parseInt(document.getElementById('fei-p-'+i)?.value)||0;
+  f.carb=parseInt(document.getElementById('fei-cb-'+i)?.value)||0;
+  save();renderNutr();if(cv==='dashboard')renderDash();
+  db.update('nutrition_foods',{id:f.id},{name:f.name,cal:f.cal,pro:f.pro,carb:f.carb}).catch(console.error);
 }
 function addDefFood(d){
   const food={id:Date.now(),name:d.name,cal:d.cal,pro:d.pro,carb:d.carb||0,fat:d.fat||0,log_date:TODAY};
