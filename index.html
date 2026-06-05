@@ -619,7 +619,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div style="font-size:13px;font-weight:500;margin-bottom:10px" id="fs-sel-name"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
-          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">Portion (g)</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="fs-unit-lbl">Portion (g)</div>
+            <div style="display:flex;gap:2px">
+              <button id="fs-unit-g" class="btn ac sm" style="padding:2px 8px;font-size:10px" onclick="setFSUnit('g')">g</button>
+              <button id="fs-unit-oz" class="btn sm" style="padding:2px 8px;font-size:10px" onclick="setFSUnit('oz')">oz</button>
+            </div>
+          </div>
           <input class="inp" style="width:100%" id="fs-grams" type="number" value="100" oninput="recalcPortion()">
         </div>
         <div id="fs-portion-macros" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;align-content:center"></div>
@@ -1298,14 +1304,27 @@ function selectFSFood(idx){
   const sel=document.querySelector(`.fs-result[data-idx="${idx}"]`);
   if(sel){sel.style.background='var(--accent-glow)';sel.style.borderColor='rgba(124,107,255,.3)';sel.classList.add('selected');}
   document.getElementById('fs-sel-name').textContent=f.description;
-  document.getElementById('fs-grams').value=100;
+  document.getElementById('fs-grams').value=_fsUnit==='oz'?3.5:100;
   document.getElementById('fs-portion').style.display='block';
   recalcPortion();
 }
 
+let _fsUnit='g';
+function setFSUnit(unit){
+  const inp=document.getElementById('fs-grams');
+  const cur=parseFloat(inp?.value)||0;
+  if(unit==='oz'&&_fsUnit==='g')inp.value=Math.round(cur/28.3495*10)/10;
+  else if(unit==='g'&&_fsUnit==='oz')inp.value=Math.round(cur*28.3495);
+  _fsUnit=unit;
+  document.getElementById('fs-unit-g').className=unit==='g'?'btn ac sm':'btn sm';
+  document.getElementById('fs-unit-oz').className=unit==='oz'?'btn ac sm':'btn sm';
+  document.getElementById('fs-unit-lbl').textContent=`Portion (${unit})`;
+  recalcPortion();
+}
 function recalcPortion(){
   if(!fsSelected)return;
-  const g=parseFloat(document.getElementById('fs-grams').value)||0;
+  const val=parseFloat(document.getElementById('fs-grams').value)||0;
+  const g=_fsUnit==='oz'?val*28.3495:val;
   const scale=g/100;
   const cal=Math.round(fsSelected.cal100*scale);
   const pro=Math.round(fsSelected.pro100*scale);
@@ -1319,9 +1338,11 @@ function recalcPortion(){
 
 function logFSFood(){
   if(!fsSelected)return;
-  const g=parseFloat(document.getElementById('fs-grams').value)||100;
+  const val=parseFloat(document.getElementById('fs-grams').value)||(_fsUnit==='oz'?3.5:100);
+  const g=_fsUnit==='oz'?val*28.3495:val;
   const scale=g/100;
-  const food={id:Date.now(),name:`${fsSelected.name} (${g}g)`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale),log_date:TODAY};
+  const label=_fsUnit==='oz'?`${val}oz`:`${Math.round(g)}g`;
+  const food={id:Date.now(),name:`${fsSelected.name} (${label})`,cal:Math.round(fsSelected.cal100*scale),pro:Math.round(fsSelected.pro100*scale),carb:Math.round(fsSelected.carb100*scale),fat:Math.round(fsSelected.fat100*scale),log_date:TODAY};
   S.nutrition.foods.push(food);save();closeFS();renderNutr();if(cv==='dashboard')renderDash();
   db.insert('nutrition_foods',food).catch(console.error);
 }
