@@ -99,6 +99,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .gpg{grid-template-columns:1fr!important;}
   .tb-actions .btn:not(.ac){display:none;}
   .fld,.fle{opacity:1;}
+  /* Bottom sheet modals */
+  .mover{padding:0;align-items:flex-end;}
+  .modal{border-radius:20px 20px 0 0;padding:8px 16px calc(20px + var(--sfb));max-height:88vh;max-width:100%!important;}
+  .modal-handle{display:block;}
+  .mclose{margin-top:0;}
+  /* Food search: cap results height so portion picker is always reachable */
+  #fs-results{max-height:36vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  /* Barcode: shrink video so controls fit without scrolling */
+  #bc-video-wrap{aspect-ratio:unset!important;height:180px;}
+  /* Default food macros: 2-col on mobile */
+  .df-macros-grid{grid-template-columns:1fr 1fr!important;}
 }
 /* CARDS */
 .card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;}
@@ -307,6 +318,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mtit{font-size:15px;font-weight:500;margin-bottom:4px;}
 .msub{font-size:12px;color:var(--text3);margin-bottom:16px;}
 .mclose{float:right;cursor:pointer;color:var(--text3);font-size:18px;line-height:1;margin-top:-2px;}
+.modal-handle{display:none;width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px;}
 .dz{border:1px dashed var(--border2);border-radius:var(--rl);padding:32px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:12px;}
 .dz:hover{border-color:var(--accent);background:var(--accent-glow);}
 .dz img{max-width:100%;max-height:180px;border-radius:var(--r);margin-bottom:8px;}
@@ -593,6 +605,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <!-- FOOD SEARCH MODAL -->
 <div id="fsmodal" class="mover" style="display:none" onclick="if(event.target===this)closeFS()">
   <div class="modal" style="max-width:520px">
+    <div class="modal-handle"></div>
     <span class="mclose" onclick="closeFS()">×</span>
     <div class="mtit">Food database search</div>
     <div class="msub">USDA FoodData Central · 400,000+ foods</div>
@@ -619,6 +632,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <!-- BARCODE MODAL -->
 <div id="bcmodal" class="mover" style="display:none" onclick="if(event.target===this)closeBC()">
   <div class="modal" style="max-width:480px">
+    <div class="modal-handle"></div>
     <span class="mclose" onclick="closeBC()">×</span>
     <div class="mtit">Barcode scanner</div>
     <div class="msub">Point your camera at a barcode — or enter it manually</div>
@@ -654,12 +668,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <!-- DEFAULT FOOD MODAL -->
 <div id="dfmodal" class="mover" style="display:none" onclick="if(event.target===this)closeDF()">
   <div class="modal">
+    <div class="modal-handle"></div>
     <span class="mclose" onclick="closeDF()">×</span>
     <div class="mtit">Save default food</div>
     <div class="msub">Store a regular food for quick one-tap logging</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
       <input class="inp" style="width:100%" id="dfn" placeholder="Food name (e.g. Greek yogurt 170g)">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
+      <div class="df-macros-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
         <input class="inp" id="dfc" type="number" placeholder="kcal">
         <input class="inp" id="dfp" type="number" placeholder="P(g)">
         <input class="inp" id="dfcb" type="number" placeholder="C(g)">
