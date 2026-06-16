@@ -111,6 +111,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   /* Default food macros: 2-col on mobile */
   .df-macros-grid{grid-template-columns:1fr 1fr!important;}
 }
+/* iOS PWA standalone: env() doesn't reliably resolve, use fixed 34px safe area */
+@media(max-width:768px) and (display-mode:standalone){
+  .main{padding-bottom:calc(var(--bnav-h) + 34px);}
+  .bnav{padding-bottom:34px;}
+  .bnav::after{content:'';position:absolute;left:0;right:0;top:100%;height:34px;background:var(--bg1);}
+}
 /* CARDS */
 .card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;}
 .ch{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border);}
