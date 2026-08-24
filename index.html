@@ -204,6 +204,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tp{background:var(--accent-glow);color:var(--accent);}
 .tg{background:var(--green-bg);color:var(--green);}
 .th2{background:rgba(251,113,133,.1);color:#fb7185;}
+.tdiv{display:flex;align-items:center;gap:10px;padding:14px 0 6px;}
+.tdivl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);white-space:nowrap;}
+.tdiv::after{content:'';flex:1;height:1px;background:var(--border);}
+.tdivc{font-size:10px;font-family:var(--mono);color:var(--text3);background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;transition:all .1s;}
+.tdivc:hover{color:var(--red);background:var(--bg3);}
 /* EDIT MODE */
 .ti.editing .tt{display:none;}
 .ti.editing .tactions{opacity:1;}
@@ -1016,8 +1021,27 @@ const TAG_CLASS={personal:'tp',work:'tw',golf:'tg',health:'th2'};
 
 function renderTodos(){
   const l=document.getElementById('tlist');if(!l)return;
-  l.innerHTML=S.todos.length?S.todos.map(t=>todoRowHtml(t)).join(''):'<div class="empty">No tasks yet.</div>';
-  document.getElementById('tbadge').textContent=S.todos.filter(t=>!t.done).length;
+  const active=S.todos.filter(t=>!t.done), done=S.todos.filter(t=>t.done);
+  let html='';
+  if(!S.todos.length){
+    html='<div class="empty">No tasks yet.</div>';
+  }else{
+    html+=active.length?active.map(t=>todoRowHtml(t)).join(''):'<div class="empty">Nothing pending — nice work 🎉</div>';
+    if(done.length){
+      html+=`<div class="tdiv"><span class="tdivl">Completed · ${done.length}</span><button class="tdivc" onclick="clearDone()" title="Delete all completed tasks">Clear</button></div>`;
+      html+=done.map(t=>todoRowHtml(t)).join('');
+    }
+  }
+  l.innerHTML=html;
+  document.getElementById('tbadge').textContent=active.length;
+}
+
+function clearDone(){
+  const done=S.todos.filter(t=>t.done);
+  if(!done.length)return;
+  if(!confirm(`Delete ${done.length} completed task${done.length>1?'s':''}? This can't be undone.`))return;
+  S.todos=S.todos.filter(t=>!t.done);save();renderTodos();if(cv==='dashboard')renderDash();
+  done.forEach(t=>db.del('todos',{id:t.id}).catch(console.error));
 }
 
 function todoRowHtml(t){
