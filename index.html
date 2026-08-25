@@ -205,6 +205,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tg{background:var(--green-bg);color:var(--green);}
 .th2{background:rgba(251,113,133,.1);color:#fb7185;}
 .tdiv{display:flex;align-items:center;gap:10px;padding:14px 0 6px;}
+.tdivt{display:flex;align-items:center;gap:5px;background:transparent;border:none;cursor:pointer;padding:2px 3px;margin:-2px -3px;border-radius:4px;transition:all .1s;}
+.tdivt:hover{background:var(--bg3);}
+.tdivt:hover .tdivl,.tdivt:hover .tdivx{color:var(--text2);}
+.tdivx{font-size:9px;color:var(--text3);transition:transform .15s;}
+.tdivt.col .tdivx{transform:rotate(-90deg);}
 .tdivl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);white-space:nowrap;}
 .tdiv::after{content:'';flex:1;height:1px;background:var(--border);}
 .tdivc{font-size:10px;font-family:var(--mono);color:var(--text3);background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;transition:all .1s;}
@@ -1028,13 +1033,17 @@ function renderTodos(){
   }else{
     html+=active.length?active.map(t=>todoRowHtml(t)).join(''):'<div class="empty">Nothing pending — nice work 🎉</div>';
     if(done.length){
-      html+=`<div class="tdiv"><span class="tdivl">Completed · ${done.length}</span><button class="tdivc" onclick="clearDone()" title="Delete all completed tasks">Clear</button></div>`;
-      html+=done.map(t=>todoRowHtml(t)).join('');
+      const col=doneCollapsed();
+      html+=`<div class="tdiv"><button class="tdivt ${col?'col':''}" onclick="toggleDone()" title="${col?'Show':'Hide'} completed"><span class="tdivx">▾</span><span class="tdivl">Completed · ${done.length}</span></button><button class="tdivc" onclick="clearDone()" title="Delete all completed tasks">Clear</button></div>`;
+      if(!col)html+=done.map(t=>todoRowHtml(t)).join('');
     }
   }
   l.innerHTML=html;
   document.getElementById('tbadge').textContent=active.length;
 }
+
+function doneCollapsed(){return LS.get('todoDoneCollapsed',false);}
+function toggleDone(){LS.set('todoDoneCollapsed',!doneCollapsed());renderTodos();}
 
 function clearDone(){
   const done=S.todos.filter(t=>t.done);
