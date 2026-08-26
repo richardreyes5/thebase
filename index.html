@@ -189,8 +189,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tnedit{width:100%;margin-top:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text2);font-family:var(--font);font-size:12px;line-height:1.5;padding:5px 7px;outline:none;resize:vertical;min-height:46px;}
 .tnedit:focus{border-color:var(--accent);color:var(--text);}
 .tedit-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
-.tedit-actions{display:flex;gap:6px;}
-.btn.tsm{padding:3px 12px;font-size:11px;}
+.tdone{font-size:11px;font-family:var(--mono);color:var(--accent);padding:3px 12px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;cursor:pointer;transition:all .1s;}
+.tdone:hover{border-color:var(--accent);background:var(--accent-glow);}
 .tactions{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .1s;}
 .ti:hover .tactions{opacity:1;}
 .tact{color:var(--text3);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px;transition:all .1s;background:transparent;border:none;font-family:var(--mono);}
@@ -1023,9 +1023,12 @@ function renderDash(){
 // ── TODOS ────────────────────────────────────────────────────────────────────
 const TAGS=['personal','work','golf','health'];
 const TAG_CLASS={personal:'tp',work:'tw',golf:'tg',health:'th2'};
+let editingId=null, editDirty=false, saveTimer=null;
 
 function renderTodos(){
   const l=document.getElementById('tlist');if(!l)return;
+  // a full re-render exits edit mode — flush any pending edit first so nothing is lost
+  if(editingId!=null){persistEdit(editingId);editingId=null;}
   const active=S.todos.filter(t=>!t.done), done=S.todos.filter(t=>t.done);
   let html='';
   if(!S.todos.length){
@@ -1053,10 +1056,9 @@ function clearDone(){
   done.forEach(t=>db.del('todos',{id:t.id}).catch(console.error));
 }
 
-function todoRowHtml(t){
+function todoInner(t){
   const note=(t.notes||'').trim();
   return `
-    <div class="ti" id="ti-${t.id}">
       <div class="tck ${t.done?'done':''}" onclick="toggleTodo(${t.id})"></div>
       <div class="tmain">
         <div class="trow">
@@ -1068,39 +1070,79 @@ function todoRowHtml(t){
       <div class="tactions">
         <button class="tact edit" onclick="startEdit(${t.id})" title="${note?'Edit':'Edit / add notes'}">✎</button>
         <button class="tact del" onclick="delTodo(${t.id})" title="Delete">✕</button>
-      </div>
-    </div>`;
+      </div>`;
 }
+
+function todoRowHtml(t){return `<div class="ti" id="ti-${t.id}">${todoInner(t)}</div>`;}
 
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+// Write the open editor's current field values back to state + Supabase (no DOM change).
+function persistEdit(id){
+  const t=S.todos.find(x=>x.id===id);if(!t)return;
+  const inp=document.getElementById('tedit-'+id), ta=document.getElementById('tnedit-'+id);
+  if(!inp&&!ta)return; // editor DOM already gone; state is authoritative
+  if(inp&&inp.value.trim())t.text=inp.value.trim();
+  if(ta)t.notes=ta.value.trim();
+  editDirty=false;
+  save();
+  db.update('todos',{id},{text:t.text,tag:t.tag,notes:t.notes}).catch(console.error);
+}
+
+function scheduleSave(id){
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{saveTimer=null;if(document.getElementById('tedit-'+id))persistEdit(id);},600);
+}
+
+// Commit the open editor (if any) and collapse it back to a read-only row.
+function closeEditor(){
+  if(editingId==null)return;
+  const id=editingId; editingId=null;
+  if(saveTimer){clearTimeout(saveTimer);saveTimer=null;}
+  const t=S.todos.find(x=>x.id===id);
+  const inp=document.getElementById('tedit-'+id), ta=document.getElementById('tnedit-'+id);
+  if(t){
+    if(inp&&inp.value.trim())t.text=inp.value.trim();
+    if(ta)t.notes=ta.value.trim();
+    if(editDirty){save();db.update('todos',{id},{text:t.text,tag:t.tag,notes:t.notes}).catch(console.error);}
+  }
+  editDirty=false;
+  const row=document.getElementById('ti-'+id);
+  if(row&&t){row.classList.remove('editing');row.innerHTML=todoInner(t);}
+  if(cv==='dashboard')renderDash();
+}
+
 function startEdit(id){
+  if(editingId===id)return;            // already editing this task
+  if(editingId!=null)closeEditor();    // switching: save + collapse the other one first
   const t=S.todos.find(t=>t.id===id);if(!t)return;
   const row=document.getElementById('ti-'+id);if(!row)return;
-  // already editing
-  if(row.querySelector('.tedit'))return;
+  editingId=id; editDirty=false;
   row.classList.add('editing');
   row.innerHTML=`
     <div class="tck ${t.done?'done':''}" onclick="toggleTodo(${t.id})"></div>
-    <div class="tmain">
+    <div class="tmain" id="ted-wrap-${id}">
       <input class="tedit" id="tedit-${id}" value="${escHtml(t.text)}" placeholder="Task…">
-      <textarea class="tnedit" id="tnedit-${id}" placeholder="Add notes / details… (optional)">${escHtml(t.notes||'')}</textarea>
+      <textarea class="tnedit" id="tnedit-${id}" placeholder="Add notes / details… (saves automatically)">${escHtml(t.notes||'')}</textarea>
       <div class="tedit-bar">
         <button class="tag-cycle-btn" id="tagbtn-${id}" title="Click to change tag">${t.tag}</button>
-        <div class="tedit-actions">
-          <button class="btn ac tsm" onclick="saveEdit(${id})">Save</button>
-          <button class="btn tsm" onclick="cancelEdit(${id})">Cancel</button>
-        </div>
+        <button class="tdone" onclick="closeEditor()" title="Done editing">Done</button>
       </div>
     </div>`;
+  const wrap=document.getElementById('ted-wrap-'+id);
   const tagBtn=document.getElementById('tagbtn-'+id);
-  tagBtn.onclick=()=>cycleTagInEdit(id,tagBtn);
   const inp=document.getElementById('tedit-'+id);
+  const ta=document.getElementById('tnedit-'+id);
+  tagBtn.onclick=()=>{cycleTagInEdit(id,tagBtn);editDirty=true;scheduleSave(id);};
+  const onInput=()=>{editDirty=true;scheduleSave(id);};
+  inp.addEventListener('input',onInput);
+  ta.addEventListener('input',onInput);
+  inp.onkeydown=e=>{if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();closeEditor();}};
+  ta.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();closeEditor();}}; // Enter = newline in notes
+  // Clicking anywhere outside this editor commits + closes it
+  wrap.addEventListener('focusout',()=>{setTimeout(()=>{if(editingId===id&&!wrap.contains(document.activeElement))closeEditor();},0);});
   inp.focus();
   inp.setSelectionRange(inp.value.length,inp.value.length);
-  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();saveEdit(id);}if(e.key==='Escape')cancelEdit(id);};
-  const ta=document.getElementById('tnedit-'+id);
-  ta.onkeydown=e=>{if(e.key==='Escape')cancelEdit(id);if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();saveEdit(id);}};
 }
 
 function cycleTagInEdit(id,btn){
@@ -1108,20 +1150,6 @@ function cycleTagInEdit(id,btn){
   const idx=(TAGS.indexOf(t.tag)+1)%TAGS.length;
   t.tag=TAGS[idx];
   btn.textContent=t.tag;
-}
-
-function saveEdit(id){
-  const t=S.todos.find(t=>t.id===id);if(!t)return;
-  const inp=document.getElementById('tedit-'+id);
-  const ta=document.getElementById('tnedit-'+id);
-  if(inp&&inp.value.trim())t.text=inp.value.trim();
-  if(ta)t.notes=ta.value.trim();
-  save();renderTodos();if(cv==='dashboard')renderDash();
-  db.update('todos',{id},{text:t.text,tag:t.tag,notes:t.notes}).catch(console.error);
-}
-
-function cancelEdit(id){
-  renderTodos();
 }
 
 function cycleTag(id){
